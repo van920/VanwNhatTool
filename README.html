@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <title>🔐 Tool Dự Đoán Tài/Xỉu AI</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Orbitron', sans-serif;
+      background: linear-gradient(135deg, #102b32, #203a43, #2c5364);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+    .container {
+      background: rgba(0, 0, 0, 0.7);
+      padding: 30px;
+      border-radius: 15px;
+      box-shadow: 0 0 25px #00ffe0;
+      width: 360px;
+      text-align: center;
+      animation: glow 2s infinite alternate;
+    }
+    @keyframes glow {
+      from { box-shadow: 0 0 15px #00ffe0; }
+      to { box-shadow: 0 0 30px #00ffff; }
+    }
+    h1 { color: #00ffff; font-size: 22px; margin-bottom: 25px; }
+    input {
+      padding: 10px;
+      width: 80%;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      text-align: center;
+    }
+    button {
+      padding: 10px 20px;
+      background: linear-gradient(90deg, #ff416c, #ff4b2b);
+      border: none;
+      color: white;
+      font-size: 16px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: linear-gradient(90deg, #00c6ff, #0072ff);
+      transform: scale(1.05);
+    }
+    .hidden { display: none; }
+    .result span { font-weight: bold; color: #ffd700; }
+    .history {
+      background-color: rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      padding: 10px;
+      margin-top: 15px;
+      font-size: 14px;
+      color: #ddd;
+      word-break: break-word;
+    }
+    #status { margin-top: 10px; font-style: italic; color: #00ffcc; font-size: 13px; }
+  </style>
+</head>
+<body>
+
+<div class="container" id="keyContainer">
+  <h1>🔐 Nhập Key Truy Cập</h1>
+  <input type="text" id="keyInput" placeholder="Nhập key của bạn" />
+  <br />
+  <button onclick="kiemTraKey()">🔓 Đăng Nhập</button>
+  <div id="keyStatus" style="margin-top: 12px;"></div>
+</div>
+
+<div class="container hidden" id="toolContainer">
+  <h1>VANW NHẬT VUA TOOL 🙏</h1>
+  <div class="result" id="phien">🎲 Mã phiên: <span>...</span></div>
+  <div class="result" id="tincay">📊 Độ tin cậy: <span>...</span></div>
+  <div class="result" id="dudoan">🧠 Kết quả dự đoán: <span>...</span></div>
+  <div class="history" id="lsphien">📜 Lịch sử:<br><span>...</span></div>
+  <div id="status">⏳ Đang tải dữ liệu...</div>
+  <button onclick="layDuDoan(true)">🔁 Cập Nhật </button>
+</div>
+
+<script>
+  const keyStorageName = "du_doan_key";
+  let validKeys = {};
+
+  function getDeviceId() {
+    let id = localStorage.getItem("device_id");
+    if (!id) {
+      id = Math.random().toString(36).substring(2, 12);
+      localStorage.setItem("device_id", id);
+    }
+    return id;
+  }
+
+  async function taiDanhSachKey() {
+    try {
+      const res = await fetch("valid_keys.json");
+      validKeys = await res.json();
+    } catch (err) {
+      document.getElementById("keyStatus").innerText = "❌ Lỗi tải danh sách key!";
+    }
+  }
+
+  async function kiemTraKey() {
+    const key = document.getElementById("keyInput").value.trim();
+    const now = new Date().getTime();
+    const deviceId = getDeviceId();
+
+    if (!Object.keys(validKeys).length) {
+      await taiDanhSachKey();
+    }
+
+    const keyInfo = validKeys[key];
+    if (!keyInfo) {
+      document.getElementById("keyStatus").innerText = "❌ Key không hợp lệ!";
+      return;
+    }
+
+    if (!keyInfo.device_ids) keyInfo.device_ids = [];
+
+    if (!keyInfo.device_ids.includes(deviceId)) {
+      if (keyInfo.device_ids.length >= keyInfo.max_devices) {
+        document.getElementById("keyStatus").innerText = "❌ Key đã đạt giới hạn thiết bị!";
+        return;
+      }
+      keyInfo.device_ids.push(deviceId);
+      localStorage.setItem("validKeys", JSON.stringify(validKeys));
+    }
+
+    const expiresAt = now + keyInfo.expires * 24 * 60 * 60 * 1000;
+    localStorage.setItem(keyStorageName, JSON.stringify({ key: key, expires: expiresAt }));
+    document.getElementById("keyStatus").innerText = "✅ Key hợp lệ! Đang mở tool...";
+    setTimeout(() => showTool(), 1000);
+  }
+
+  function showTool() {
+    document.getElementById("keyContainer").classList.add("hidden");
+    document.getElementById("toolContainer").classList.remove("hidden");
+    layDuDoan(true);
+    setInterval(() => layDuDoan(false), 5000);
+  }
+
+  function checkStoredKey() {
+    const raw = localStorage.getItem(keyStorageName);
+    if (!raw) return;
+    try {
+      const data = JSON.parse(raw);
+      const now = new Date().getTime();
+      if (data.expires > now) {
+        showTool();
+      } else {
+        localStorage.removeItem(keyStorageName);
+      }
+    } catch (e) {
+      localStorage.removeItem(keyStorageName);
+    }
+  }
+
+  let phienHienTai = null;
+  async function layDuDoan(thuCong = false) {
+    const status = document.getElementById("status");
+    if (thuCong) status.innerText = "🔄 Đang cập nhật dữ liệu...";
+    try {
+      const timestamp = new Date().getTime();
+      const api = `https://wanfox.x10.mx/apisan.php?key=wanfoxdz0902zzz&t=${timestamp}`;
+      const proxy = "https://api.allorigins.win/raw?url=" + encodeURIComponent(api);
+      const res = await fetch(proxy);
+      const text = await res.text();
+      const data = JSON.parse(text);
+
+      if (data.phien !== phienHienTai) {
+        phienHienTai = data.phien;
+        document.getElementById("phien").innerHTML = '🎲 Mã phiên: <span>' + data.phien + '</span>';
+        document.getElementById("tincay").innerHTML = '📊 Độ tin cậy: <span>' + data.tincay + '%</span>';
+        const icon = data.dudoan.includes("Tài") ? "🔥" : "❄️";
+        document.getElementById("dudoan").innerHTML = '🧠 Kết quả dự đoán: <span>' + icon + ' ' + data.dudoan + '</span>';
+        document.getElementById("lsphien").innerHTML = '📜 Lịch sử:<br><span>' + data.lsphien + '</span>';
+        status.innerText = "✅ Đã cập nhật phiên mới!";
+      } else if (thuCong) {
+        status.innerText = "ℹ️ Phiên hiện tại chưa thay đổi.";
+      }
+    } catch (err) {
+      document.getElementById("dudoan").innerHTML = '<span style="color:red">❌ Không lấy được dữ liệu!</span>';
+      status.innerText = "⚠️ Lỗi gọi API. Vui lòng thử lại.";
+    }
+  }
+
+  checkStoredKey();
+</script>
+
+</body>
+</html>
