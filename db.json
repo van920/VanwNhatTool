@@ -1,0 +1,16 @@
+{
+  "history": [
+    {
+      "Phien": null,
+      "prediction": "T\u00e0i",
+      "real_result": null
+    },
+    {
+      "Phien": 2695037,
+      "prediction": "X\u1ec9u",
+      "real_result": "T\u00e0i"
+    }
+  ],
+  "dudoan_dung": 1,
+  "dudoan_sai": 0
+}
